@@ -1,0 +1,160 @@
+# Grafana – StatefulSet (sqlite), Service, Ingress, Certificate. OIDC Passmoweri kaudu.
+# Namespace: memelord-arno (sama mis MemeLordil). Ingress: https://grafana-arno.ee-lte-1.codemowers.io
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: grafana
+  namespace: memelord-arno
+  labels:
+    app: grafana
+spec:
+  serviceName: grafana
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_DATABASE_TYPE
+              value: sqlite3
+            - name: GF_DATABASE_PATH
+              value: /var/lib/grafana/grafana.db
+            - name: GF_SERVER_ROOT_URL
+              value: "https://grafana-arno.ee-lte-1.codemowers.io"
+            # OIDC (Passmower / Generic OAuth) – secret tuleb OIDCClientist: oidc-client-grafana-arno-owner-secrets
+            - name: GF_AUTH_GENERIC_OAUTH_ENABLED
+              value: "true"
+            - name: GF_AUTH_GENERIC_OAUTH_NAME
+              value: "Codemowers"
+            - name: GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP
+              value: "true"
+            - name: GF_AUTH_GENERIC_OAUTH_SCOPES
+              value: "openid profile"
+            - name: GF_AUTH_GENERIC_OAUTH_AUTH_URL
+              value: "https://auth.ee-lte-1.codemowers.io/auth"
+            - name: GF_AUTH_GENERIC_OAUTH_TOKEN_URL
+              value: "http://passmower.passmower/token"
+            - name: GF_AUTH_GENERIC_OAUTH_API_URL
+              value: "http://passmower.passmower/me"
+            - name: GF_AUTH_GENERIC_OAUTH_SIGNOUT_REDIRECT_URL
+              value: "https://auth.ee-lte-1.codemowers.io/oidc/sign_out"
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-grafana-arno-owner-secrets
+                  key: OIDC_CLIENT_ID
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-grafana-arno-owner-secrets
+                  key: OIDC_CLIENT_SECRET
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: grafana-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: sqlite
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: memelord-arno
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-arno
+  namespace: memelord-arno
+spec:
+  secretName: grafana-arno-tls
+  dnsNames:
+    - grafana-arno.ee-lte-1.codemowers.io
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-arno
+  namespace: memelord-arno
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: grafana-arno.ee-lte-1.codemowers.io
+      http:
+        paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+  tls:
+    - secretName: grafana-arno-tls
+---
+# OIDC client (Passmower) – secret oidc-client-grafana-arno-owner-secrets luuakse selle järgi
+apiVersion: codemowers.cloud/v1beta1
+kind: OIDCClient
+metadata:
+  name: grafana-arno
+  namespace: memelord-arno
+spec:
+  displayName: Grafana arno
+  uri: https://grafana-arno.ee-lte-1.codemowers.io/
+  redirectUris:
+    - https://grafana-arno.ee-lte-1.codemowers.io/login/generic_oauth
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - code
+  availableScopes:
+    - openid
+    - profile
+  pkce: false
