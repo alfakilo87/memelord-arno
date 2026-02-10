@@ -1,0 +1,399 @@
+---
+apiVersion: secretgenerator.mittwald.de/v1alpha1
+kind: StringSecret
+metadata:
+  name: memelord-arno-redis
+spec:
+  fields:
+    - fieldName: redis-password
+      length: "32"
+      encoding: hex
+---
+apiVersion: secretgenerator.mittwald.de/v1alpha1
+kind: StringSecret
+metadata:
+  name: memelord-arno-django
+spec:
+  fields:
+    - fieldName: secret-key
+      length: "64"
+      encoding: hex
+---
+# S3/MinIO: virtual-hosted-style vajab DNS-i minio + memelord-arno.minio (minio-bucket-alias.yaml)
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: memelord-arno
+spec:
+  type: ExternalName
+  externalName: minio.minio.svc.cluster.local
+---
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: memelord-arno-redis
+spec:
+  authentication:
+    passwordFromSecret:
+      name: memelord-arno-redis
+      key: redis-password
+  replicas: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      cpu: 600m
+      memory: 750Mi
+---
+apiVersion: secretgenerator.mittwald.de/v1alpha1
+kind: StringSecret
+metadata:
+  name: memelord-arno-database
+  labels:
+    cnpg.io/reload: "true"
+spec:
+  data:
+    username: memelord-arno
+  fields:
+    - fieldName: password
+      length: "32"
+      encoding: hex
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: memelord-arno-database
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  storage:
+    size: 1Gi
+    storageClass: postgres
+  affinity:
+    podAntiAffinityType: required
+    nodeSelector:
+      codemowers.io/lvm-ubuntu-vg: enterprise-ssd
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "4Gi"
+  postgresql:
+    parameters:
+      max_connections: "300"
+      shared_buffers: "512MB"
+      effective_cache_size: "2GB"
+  managed:
+    roles:
+    - name: memelord-arno
+      ensure: present
+      login: true
+      passwordSecret:
+        name: memelord-arno-database
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: memelord-arno
+spec:
+  name: memelord-arno
+  owner: memelord-arno
+  cluster:
+    name: memelord-arno-database
+---
+apiVersion: s3.onyxia.sh/v1alpha1
+kind: Policy
+metadata:
+  name: memelord-arno-policy
+spec:
+  name: memelord-arno-policy
+  s3InstanceRef: minio/default
+  policyContent: >-
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "s3:ListBucket",
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:HeadObject"
+          ],
+          "Resource": [
+            "arn:aws:s3:::memelord-arno",
+            "arn:aws:s3:::memelord-arno/*"
+          ]
+        }
+      ]
+    }
+---
+apiVersion: s3.onyxia.sh/v1alpha1
+kind: S3User
+metadata:
+  name: memelord-arno-bucket
+spec:
+  accessKey: memelord-arno-bucket # This is automatically created
+  policies:
+    - memelord-arno-policy
+  s3InstanceRef: minio/default
+---
+apiVersion: s3.onyxia.sh/v1alpha1
+kind: Bucket
+metadata:
+  name: memelord-arno
+spec:
+  name: memelord-arno
+  s3InstanceRef: minio/default
+  quota:
+    default: 100000000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memelord-arno
+  namespace: memelord-arno
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memelord
+  template:
+    metadata:
+      labels:
+        app: memelord
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 33
+        runAsGroup: 33
+      containers:
+        - name: memelord-arno
+          image: ghcr.io/l4rm4nd/memelord:latest
+          imagePullPolicy: Always
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            # General Django settings
+            - name: DOMAIN
+              value: "memelord-arno.ee-lte-1.codemowers.io,localhost,127.0.0.1"
+            - name: DEBUG
+              value: "False"
+            - name: DJANGO_LOG_LEVEL
+              value: "INFO"
+            - name: SECURE_COOKIES
+              value: "True"
+            - name: SESSION_COOKIE_AGE
+              value: "30"
+            - name: SESSION_EXPIRE_AT_BROWSER_CLOSE
+              value: "False"
+            - name: TZ
+              value: "Europe/Tallinn"
+            - name: ENABLE_PUBLIC_FEED
+              value: "False"
+            - name: MAX_UPLOAD_SIZE_MB
+              value: "10"
+            # Ühine kõigil replica-del (vajalik OIDC state/session jaoks)
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-django
+                  key: secret-key
+            
+            # OIDC (codemowers) – secret oidc-client-memelord-arno-owner-secrets
+            - name: OIDC_ENABLED
+              value: "True"
+            - name: OIDC_AUTOLOGIN
+              value: "False"
+            - name: OIDC_CREATE_USER
+              value: "True"
+            - name: OIDC_RP_SIGN_ALGO
+              value: "RS256"
+            - name: OIDC_RP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-memelord-arno-owner-secrets
+                  key: OIDC_CLIENT_ID
+            - name: OIDC_RP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-memelord-arno-owner-secrets
+                  key: OIDC_CLIENT_SECRET
+            # Authorization endpoint = avalik URL (brauser suunatakse sinna). Token/userinfo/jwks = sisemine (pod kutsub)
+            - name: OIDC_OP_AUTHORIZATION_ENDPOINT
+              value: "https://auth.ee-lte-1.codemowers.io/auth"
+            - name: OIDC_OP_TOKEN_ENDPOINT
+              value: "http://passmower.passmower/token"
+            - name: OIDC_OP_USER_ENDPOINT
+              value: "http://passmower.passmower/me"
+            - name: OIDC_OP_JWKS_ENDPOINT
+              value: "http://passmower.passmower/jwks"
+            
+            # PostgreSQL Database Configuration
+            - name: DB_ENGINE
+              value: "postgres"
+            - name: POSTGRES_HOST
+              value: "memelord-arno-database-rw"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-database-app
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-database-app
+                  key: password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-database-app
+                  key: dbname
+            
+            # Redis Configuration (for session storage and caching)
+            - name: REDIS_HOST
+              value: "memelord-arno-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DB
+              value: "0"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-redis
+                  key: redis-password
+            
+            # Storage backend (must be S3 bucket)
+            - name: STORAGE_BACKEND
+              value: "s3"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-bucket
+                  key: accessKey
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: memelord-arno-bucket
+                  key: secretKey
+            - name: AWS_STORAGE_BUCKET_NAME
+              value: "memelord-arno"
+            - name: AWS_S3_REGION_NAME
+              value: "ee-lte-1"
+            # Public MinIO URL so the browser can load media (path-style: https://minio.../memelord-arno/media/...)
+            - name: AWS_S3_CUSTOM_DOMAIN
+              value: "minio.ee-lte-1.codemowers.io/memelord-arno"
+            # Backend uses internal endpoint; MEDIA_URL uses AWS_S3_CUSTOM_DOMAIN
+            - name: AWS_S3_ENDPOINT_URL
+              value: "http://minio:9000"
+            - name: AWS_DEFAULT_ACL
+              value: "private"
+            - name: AWS_QUERYSTRING_AUTH
+              value: "True"
+            - name: AWS_S3_FILE_OVERWRITE
+              value: "False"
+            - name: AWS_LOCATION
+              value: "media"
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/app/logs
+            - name: media
+              mountPath: /opt/app/media
+            # collectstatic writes into STATIC_ROOT=/opt/app/myapp/static
+            - name: static
+              mountPath: /opt/app/myapp/static
+            # Override Django settings.py via ConfigMap (only the file, not the whole directory)
+            - name: settings
+              mountPath: /opt/app/myproject/settings.py
+              subPath: settings.py
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: media
+          emptyDir: {}
+        - name: static
+          emptyDir: {}
+        - name: settings
+          configMap:
+            name: settings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: memelord
+  namespace: memelord-arno
+spec:
+  type: ClusterIP
+  selector:
+    app: memelord
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: memelord-arno
+  namespace: memelord-arno
+spec:
+  secretName: memelord-arno-tls
+  dnsNames:
+    - memelord-arno.ee-lte-1.codemowers.io
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: memelord-arno
+  namespace: memelord-arno
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: memelord-arno.ee-lte-1.codemowers.io
+      http:
+        paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: memelord
+                port:
+                  number: 80
+  tls:
+    - secretName: memelord-arno-tls
+---
+# OIDC client for MemeLord (codemowers cluster OIDC). Enable OIDC in app via env: OIDC_ENABLED=True + OIDC_* vars from secret.
+apiVersion: codemowers.cloud/v1beta1
+kind: OIDCClient
+metadata:
+  name: memelord-arno
+  namespace: memelord-arno
+spec:
+  displayName: Memelord arno
+  uri: https://memelord-arno.ee-lte-1.codemowers.io/
+  redirectUris:
+    - https://memelord-arno.ee-lte-1.codemowers.io/oidc/callback/
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - code
+  availableScopes:
+    - openid
+    - profile
+  pkce: false
