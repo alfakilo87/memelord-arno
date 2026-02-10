@@ -68,6 +68,9 @@ spec:
               value: /var/lib/grafana/grafana.db
             - name: GF_SERVER_ROOT_URL
               value: "https://grafana-arno.ee-lte-1.codemowers.io"
+            # Uued OAuth kasutajad saavad vaikimisi Admin (näevad Data sources, saavad hallata)
+            - name: GF_USERS_DEFAULT_ROLE
+              value: "Admin"
             # OIDC (Passmower / Generic OAuth) – secret tuleb OIDCClientist: oidc-client-grafana-arno-owner-secrets
             - name: GF_AUTH_GENERIC_OAUTH_ENABLED
               value: "true"
