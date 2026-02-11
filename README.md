@@ -83,17 +83,17 @@ flowchart TB
     CERT_gr --> ING_gr
     MON -.-> CM
 
-    classDef stringSecret fill:#f5f5f5,stroke:#9e9e9e
-    classDef service fill:#bbdefb,stroke:#1976d2
-    classDef dragonfly fill:#c8e6c9,stroke:#388e3c
-    classDef cnpg fill:#b2dfdb,stroke:#00796b
-    classDef s3 fill:#ffe0b2,stroke:#e65100
-    classDef workload fill:#e1bee7,stroke:#7b1fa2
-    classDef configmap fill:#fff9c4,stroke:#f9a825
-    classDef certificate fill:#c5e1a5,stroke:#558b2f
-    classDef ingress fill:#ffcdd2,stroke:#c62828
-    classDef oidc fill:#b3e5fc,stroke:#0277bd
-    classDef external fill:#cfd8dc,stroke:#455a64
+    classDef stringSecret fill:#f5f5f5,stroke:#424242,color:#1a1a1a
+    classDef service fill:#bbdefb,stroke:#0d47a1,color:#0d47a1
+    classDef dragonfly fill:#c8e6c9,stroke:#1b5e20,color:#1b5e20
+    classDef cnpg fill:#b2dfdb,stroke:#004d40,color:#004d40
+    classDef s3 fill:#ffe0b2,stroke:#bf360c,color:#bf360c
+    classDef workload fill:#e1bee7,stroke:#4a148c,color:#4a148c
+    classDef configmap fill:#fff9c4,stroke:#f57f17,color:#5d4037
+    classDef certificate fill:#c5e1a5,stroke:#33691e,color:#33691e
+    classDef ingress fill:#ffcdd2,stroke:#b71c1c,color:#b71c1c
+    classDef oidc fill:#b3e5fc,stroke:#01579b,color:#01579b
+    classDef external fill:#cfd8dc,stroke:#263238,color:#263238
 
     class SS_redis,SS_django,SS_db stringSecret
     class SVC_minio,SVC_ml,SVC_gr service
@@ -107,9 +107,10 @@ flowchart TB
     class OIDC_ml,OIDC_gr oidc
     class MINIO,LE,PM,MON external
 
-    style memelord fill:#e2e8f0,stroke:#a0aec0
-    style grafana fill:#e2e8f0,stroke:#a0aec0
-    style external fill:#e2e8f0,stroke:#a0aec0
+    linkStyle default stroke:#2d3748,stroke-width:2
+    style memelord fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style grafana fill:#e2e8f0,stroke:#4a5568,color:#1a202c
+    style external fill:#e2e8f0,stroke:#4a5568,color:#1a202c
 ```
 
 ## Deploy (manuaalne)
