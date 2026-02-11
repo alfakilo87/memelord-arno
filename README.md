@@ -82,6 +82,30 @@ flowchart TB
     SVC_gr --> ING_gr
     CERT_gr --> ING_gr
     MON -.-> CM
+
+    classDef stringSecret fill:#f5f5f5,stroke:#9e9e9e
+    classDef service fill:#bbdefb,stroke:#1976d2
+    classDef dragonfly fill:#c8e6c9,stroke:#388e3c
+    classDef cnpg fill:#b2dfdb,stroke:#00796b
+    classDef s3 fill:#ffe0b2,stroke:#e65100
+    classDef workload fill:#e1bee7,stroke:#7b1fa2
+    classDef configmap fill:#fff9c4,stroke:#f9a825
+    classDef certificate fill:#c5e1a5,stroke:#558b2f
+    classDef ingress fill:#ffcdd2,stroke:#c62828
+    classDef oidc fill:#b3e5fc,stroke:#0277bd
+    classDef external fill:#cfd8dc,stroke:#455a64
+
+    class SS_redis,SS_django,SS_db stringSecret
+    class SVC_minio,SVC_ml,SVC_gr service
+    class DRAG dragonfly
+    class CNPG,DB cnpg
+    class POL,S3U,BUCK s3
+    class DEP,STS workload
+    class CM configmap
+    class CERT_ml,CERT_gr certificate
+    class ING_ml,ING_gr ingress
+    class OIDC_ml,OIDC_gr oidc
+    class MINIO,LE,PM,MON external
 ```
 
 ## Deploy (manuaalne)
