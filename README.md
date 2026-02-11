@@ -106,6 +106,10 @@ flowchart TB
     class ING_ml,ING_gr ingress
     class OIDC_ml,OIDC_gr oidc
     class MINIO,LE,PM,MON external
+
+    style memelord fill:#e2e8f0,stroke:#a0aec0
+    style grafana fill:#e2e8f0,stroke:#a0aec0
+    style external fill:#e2e8f0,stroke:#a0aec0
 ```
 
 ## Deploy (manuaalne)
