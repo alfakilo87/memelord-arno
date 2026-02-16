@@ -1,0 +1,6 @@
+.git
+.gitignore
+README.md
+grafana-promote-user.sh
+argocd-application-memelord-arno.yaml
+argocd-application-memelord-arno2.yaml

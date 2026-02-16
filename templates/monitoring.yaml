@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
   name: google-probe
-  namespace: memelord-arno
+  namespace: {{ .Release.Namespace }}
 spec:
   module: http_2xx
   prober:

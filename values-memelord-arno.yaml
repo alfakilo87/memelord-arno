@@ -1,0 +1,3 @@
+hostname: memelord-arno.ee-lte-1.codemowers.io
+grafanaHostname: grafana-arno.ee-lte-1.codemowers.io
+grafanaOidcName: grafana-arno
