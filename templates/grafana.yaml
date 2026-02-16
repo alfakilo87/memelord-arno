@@ -139,7 +139,7 @@ metadata:
   name: {{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}
   namespace: {{ .Release.Namespace }}
 spec:
-  secretName: {{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}-tls
+  secretName: {{ printf "%s-tls" (.Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name)) }}
   dnsNames:
     - {{ .Values.grafanaHostname }}
   issuerRef:
@@ -167,7 +167,7 @@ spec:
                 port:
                   number: 3000
   tls:
-    - secretName: {{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}-tls
+    - secretName: {{ printf "%s-tls" (.Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name)) }}
 ---
 apiVersion: codemowers.cloud/v1beta1
 kind: OIDCClient
