@@ -1,9 +1,21 @@
+# =============================================================================
+# Ülesande täpsustus (Teisipäeva lõpp)
+# =============================================================================
+# 1. Grafana StatefulSet, storage class 'sqlite' (PVC 5Gi)     – tehtud
+# 2. Ingress välisligipääsuks (nt grafana-arno.ee-lte-1.codemowers.io) – tehtud
+# 3. Ingressile vastav Certificate (cert-manager, letsencrypt)  – tehtud
+# 4. OIDC autent Passmoweri kaudu (OIDCClient + GF_AUTH_GENERIC_OAUTH_*) – tehtud
+# 5. Prometheus ja Loki datasourced (provisioning allpool):
+#    - Loki:    http://loki.monitoring.svc.cluster.local:3100
+#    - Prometheus: http://prometheus-operated.monitoring.svc.cluster.local:9090
+# Namespace: memelord-arno. URL: https://grafana-arno.ee-lte-1.codemowers.io
+# =============================================================================
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-datasources
-  namespace: {{ .Release.Namespace }}
+  namespace: memelord-arno
 data:
   datasources.yaml: |
     apiVersion: 1
@@ -24,7 +36,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: grafana
-  namespace: {{ .Release.Namespace }}
+  namespace: memelord-arno
   labels:
     app: grafana
 spec:
@@ -55,15 +67,18 @@ spec:
             - name: GF_DATABASE_PATH
               value: /var/lib/grafana/grafana.db
             - name: GF_SERVER_ROOT_URL
-              value: "https://{{ .Values.grafanaHostname }}"
+              value: "https://grafana-arno.ee-lte-1.codemowers.io"
+            # Uued OAuth kasutajad saavad vaikimisi Admin (näevad Data sources, saavad hallata)
             - name: GF_USERS_DEFAULT_ROLE
               value: "Admin"
+            # OIDC (Passmower / Generic OAuth) – secret tuleb OIDCClientist: oidc-client-grafana-arno-owner-secrets
             - name: GF_AUTH_GENERIC_OAUTH_ENABLED
               value: "true"
             - name: GF_AUTH_GENERIC_OAUTH_NAME
               value: "Codemowers"
             - name: GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP
               value: "true"
+            # SSO Admin: kui kasutaja kuulub github.com:codemowers:admins gruppi, saab Grafana Admin
             - name: GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN
               value: "true"
             - name: GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH
@@ -81,12 +96,12 @@ spec:
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-{{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}-owner-secrets
+                  name: oidc-client-grafana-arno-owner-secrets
                   key: OIDC_CLIENT_ID
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-{{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}-owner-secrets
+                  name: oidc-client-grafana-arno-owner-secrets
                   key: OIDC_CLIENT_SECRET
           volumeMounts:
             - name: grafana-storage
@@ -121,7 +136,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grafana
-  namespace: {{ .Release.Namespace }}
+  namespace: memelord-arno
   labels:
     app: grafana
 spec:
@@ -136,12 +151,12 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}
-  namespace: {{ .Release.Namespace }}
+  name: grafana-arno
+  namespace: memelord-arno
 spec:
-  secretName: {{ printf "%s-tls" (.Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name)) }}
+  secretName: grafana-arno-tls
   dnsNames:
-    - {{ .Values.grafanaHostname }}
+    - grafana-arno.ee-lte-1.codemowers.io
   issuerRef:
     name: letsencrypt
     kind: ClusterIssuer
@@ -149,14 +164,14 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}
-  namespace: {{ .Release.Namespace }}
+  name: grafana-arno
+  namespace: memelord-arno
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
   ingressClassName: traefik
   rules:
-    - host: {{ .Values.grafanaHostname }}
+    - host: grafana-arno.ee-lte-1.codemowers.io
       http:
         paths:
           - pathType: Prefix
@@ -167,18 +182,19 @@ spec:
                 port:
                   number: 3000
   tls:
-    - secretName: {{ printf "%s-tls" (.Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name)) }}
+    - secretName: grafana-arno-tls
 ---
+# OIDC client (Passmower) – secret oidc-client-grafana-arno-owner-secrets luuakse selle järgi
 apiVersion: codemowers.cloud/v1beta1
 kind: OIDCClient
 metadata:
-  name: {{ .Values.grafanaOidcName | default (printf "grafana-%s" .Release.Name) }}
-  namespace: {{ .Release.Namespace }}
+  name: grafana-arno
+  namespace: memelord-arno
 spec:
-  displayName: Grafana {{ .Release.Name }}
-  uri: https://{{ .Values.grafanaHostname }}/
+  displayName: Grafana arno
+  uri: https://grafana-arno.ee-lte-1.codemowers.io/
   redirectUris:
-    - https://{{ .Values.grafanaHostname }}/login/generic_oauth
+    - https://grafana-arno.ee-lte-1.codemowers.io/login/generic_oauth
   grantTypes:
     - authorization_code
     - refresh_token

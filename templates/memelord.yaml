@@ -2,7 +2,7 @@
 apiVersion: secretgenerator.mittwald.de/v1alpha1
 kind: StringSecret
 metadata:
-  name: {{ .Release.Name }}-redis
+  name: {{ printf "%s-redis" .Release.Name }}
 spec:
   fields:
     - fieldName: redis-password
@@ -12,7 +12,7 @@ spec:
 apiVersion: secretgenerator.mittwald.de/v1alpha1
 kind: StringSecret
 metadata:
-  name: {{ .Release.Name }}-django
+  name: {{ printf "%s-django" .Release.Name }}
 spec:
   fields:
     - fieldName: secret-key
@@ -31,11 +31,11 @@ spec:
 apiVersion: dragonflydb.io/v1alpha1
 kind: Dragonfly
 metadata:
-  name: {{ .Release.Name }}-redis
+  name: {{ printf "%s-redis" .Release.Name }}
 spec:
   authentication:
     passwordFromSecret:
-      name: {{ .Release.Name }}-redis
+      name: {{ printf "%s-redis" .Release.Name }}
       key: redis-password
   replicas: 1
   resources:
@@ -49,7 +49,7 @@ spec:
 apiVersion: secretgenerator.mittwald.de/v1alpha1
 kind: StringSecret
 metadata:
-  name: {{ .Release.Name }}-database
+  name: {{ printf "%s-database" .Release.Name }}
   labels:
     cnpg.io/reload: "true"
 spec:
@@ -63,7 +63,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}-database
+  name: {{ printf "%s-database" .Release.Name }}
 spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:17
@@ -92,7 +92,7 @@ spec:
       ensure: present
       login: true
       passwordSecret:
-        name: {{ .Release.Name }}-database
+        name: {{ printf "%s-database" .Release.Name }}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
@@ -102,14 +102,14 @@ spec:
   name: {{ .Release.Name }}
   owner: {{ .Release.Name }}
   cluster:
-    name: {{ .Release.Name }}-database
+    name: {{ printf "%s-database" .Release.Name }}
 ---
 apiVersion: s3.onyxia.sh/v1alpha1
 kind: Policy
 metadata:
-  name: {{ .Release.Name }}-policy
+  name: {{ printf "%s-policy" .Release.Name }}
 spec:
-  name: {{ .Release.Name }}-policy
+  name: {{ printf "%s-policy" .Release.Name }}
   s3InstanceRef: minio/default
   policyContent: >-
     {
@@ -134,11 +134,11 @@ spec:
 apiVersion: s3.onyxia.sh/v1alpha1
 kind: S3User
 metadata:
-  name: {{ .Release.Name }}-bucket
+  name: {{ printf "%s-bucket" .Release.Name }}
 spec:
-  accessKey: {{ .Release.Name }}-bucket
+  accessKey: {{ printf "%s-bucket" .Release.Name }}
   policies:
-    - {{ .Release.Name }}-policy
+    - {{ printf "%s-policy" .Release.Name }}
   s3InstanceRef: minio/default
 ---
 apiVersion: s3.onyxia.sh/v1alpha1
@@ -202,7 +202,7 @@ spec:
             - name: SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-django
+                  name: {{ printf "%s-django" .Release.Name }}
                   key: secret-key
             - name: OIDC_ENABLED
               value: "True"
@@ -215,12 +215,12 @@ spec:
             - name: OIDC_RP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-{{ .Release.Name }}-owner-secrets
+                  name: {{ printf "oidc-client-%s-owner-secrets" .Release.Name }}
                   key: OIDC_CLIENT_ID
             - name: OIDC_RP_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-{{ .Release.Name }}-owner-secrets
+                  name: {{ printf "oidc-client-%s-owner-secrets" .Release.Name }}
                   key: OIDC_CLIENT_SECRET
             - name: OIDC_OP_AUTHORIZATION_ENDPOINT
               value: "https://auth.ee-lte-1.codemowers.io/auth"
@@ -233,26 +233,26 @@ spec:
             - name: DB_ENGINE
               value: "postgres"
             - name: POSTGRES_HOST
-              value: "{{ .Release.Name }}-database-rw"
+              value: '{{ printf "%s-database-rw" .Release.Name }}'
             - name: POSTGRES_PORT
               value: "5432"
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-database-app
+                  name: {{ printf "%s-database-app" .Release.Name }}
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-database-app
+                  name: {{ printf "%s-database-app" .Release.Name }}
                   key: password
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-database-app
+                  name: {{ printf "%s-database-app" .Release.Name }}
                   key: dbname
             - name: REDIS_HOST
-              value: "{{ .Release.Name }}-redis"
+              value: '{{ printf "%s-redis" .Release.Name }}'
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_DB
@@ -260,19 +260,19 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-redis
+                  name: {{ printf "%s-redis" .Release.Name }}
                   key: redis-password
             - name: STORAGE_BACKEND
               value: "s3"
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-bucket
+                  name: {{ printf "%s-bucket" .Release.Name }}
                   key: accessKey
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-bucket
+                  name: {{ printf "%s-bucket" .Release.Name }}
                   key: secretKey
             - name: AWS_STORAGE_BUCKET_NAME
               value: "{{ .Release.Name }}"
@@ -331,7 +331,7 @@ metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
-  secretName: {{ .Release.Name }}-tls
+  secretName: {{ printf "%s-tls" .Release.Name }}
   dnsNames:
     - {{ .Values.hostname }}
   issuerRef:
@@ -359,7 +359,7 @@ spec:
                 port:
                   number: 80
   tls:
-    - secretName: {{ .Release.Name }}-tls
+    - secretName: {{ printf "%s-tls" .Release.Name }}
 ---
 apiVersion: codemowers.cloud/v1beta1
 kind: OIDCClient
