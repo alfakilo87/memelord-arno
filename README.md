@@ -1,6 +1,6 @@
 # memelord-arno
 
-MemeLord (Django) + Grafana Helm chart. Mitu instantsi võimalik ({{ .Release.Name }}, values-*.yaml).
+MemeLord (Django) + Grafana. MemeLord deploy'itakse Helm templatitega (mitu instantsi võimalik), Grafana staatilise confifailiga.
 
 | Rakendus | URL |
 |----------|-----|
@@ -11,9 +11,10 @@ MemeLord (Django) + Grafana Helm chart. Mitu instantsi võimalik ({{ .Release.Na
 
 | Fail | Kirjeldus |
 |------|-----------|
-| `Chart.yaml`, `values.yaml`, `values-memelord-arno.yaml`, `values-memelord-arno2.yaml` | Helm chart ja values |
-| `templates/memelord.yaml`, `templates/grafana.yaml`, `templates/monitoring.yaml` | Templatiseeritud manifestid |
-| `grafana-promote-user.sh` | Helper: tõsta OIDC kasutaja Grafana Admin’iks (SQLite DB muudatus) |
+| `Chart.yaml`, `values-memelord-arno.yaml`, `values-memelord-arno2.yaml` | Helm chart ja values (MemeLord) |
+| `templates/memelord.yaml`, `templates/monitoring.yaml` | Helm templatid (MemeLord) |
+| `grafana.yaml` | Staatiline confifail – Grafana (kubectl apply) |
+| `memelord-arno.yaml`, `memelord-arno2.yaml` | ArgoCD Application manifestid |
 
 **Välised sõltuvused (klaster):** `minio/default`, `letsencrypt` ClusterIssuer, `passmower` (OIDC), `monitoring` namespace (Prometheus, Loki).
 
@@ -113,21 +114,23 @@ flowchart TB
     style external fill:#e2e8f0,stroke:#4a5568,color:#1a202c
 ```
 
-## Deploy (Helm)
+## Deploy
 
 ```bash
 kubectl create namespace memelord-arno
 
-# MemeLord
+# MemeLord (Helm)
 kubectl create configmap settings --from-file=settings.py=./settings.py -n memelord-arno --dry-run=client -o yaml | kubectl apply -f -
 helm upgrade --install memelord-arno . -n memelord-arno -f values-memelord-arno.yaml
+
+# Grafana (staatiline confifail)
+kubectl apply -f grafana.yaml
 ```
 
-**Grafana kasutaja Admin’iks:** `./grafana-promote-user.sh memelord-arno arno.kender@gmail.com`
 
 ## ArgoCD
 
 - **ArgoCD** jookseb **ee-west-1** klustris; **rakendused** deploy’itakse **ee-lte-1** klustrisse.
 - **Repo:** https://github.com/alfakilo87/memelord-arno  
 - **UI:** https://argocd.ee-west-1.codemowers.io/applications  
-- **memelord-arno:** `argocd-application-memelord-arno.yaml` | **memelord-arno2:** `argocd-application-memelord-arno2.yaml`
+- **memelord-arno:** `memelord-arno.yaml` | **memelord-arno2:** `memelord-arno2.yaml`

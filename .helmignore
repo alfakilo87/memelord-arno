@@ -1,5 +1,6 @@
 .git
 .gitignore
 README.md
-argocd-application-memelord-arno.yaml
-argocd-application-memelord-arno2.yaml
+memelord-arno.yaml
+memelord-arno2.yaml
+grafana.yaml

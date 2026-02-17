@@ -1,9 +1,9 @@
-# ArgoCD Application – memelord-arno (Helm chart). ArgoCD ee-west-1, siht ee-lte-1.
+# ArgoCD Application – memelord-arno2 (teine instants, sama Helm chart). ArgoCD ee-west-1, siht ee-lte-1.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: memelord-arno
-  namespace: argocd
+  name: memelord-arno2
+  namespace: memelord-arno
 spec:
   project: default
   source:
@@ -12,8 +12,8 @@ spec:
     path: .
     helm:
       valueFiles:
-        - values-memelord-arno.yaml
-      releaseName: memelord-arno
+        - values-memelord-arno2.yaml
+      releaseName: memelord-arno2
   destination:
     name: ee-lte-1
     namespace: memelord-arno
