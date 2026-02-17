@@ -1,0 +1,82 @@
+# Network Policies – memelord-arno
+# Ainult ingress (sisenev liiklus). Egress ei puutu.
+# Enne rakendamist kontrolli pod label'id: kubectl get pods -n memelord-arno --show-labels
+#
+# Kui monitoring namespace'il puudub label kubernetes.io/metadata.name=monitoring:
+#   kubectl label namespace monitoring kubernetes.io/metadata.name=monitoring --overwrite
+#
+# 1. Dragonfly – blokeeri ingress, luba rakendus + Prometheus
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dragonfly-ingress
+  namespace: memelord-arno
+spec:
+  podSelector:
+    matchLabels:
+      app: memelord-arno-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    # Rakendus (MemeLord Django) – ühendub Dragonflyga
+    - from:
+        - podSelector:
+            matchLabels:
+              app: memelord
+      ports:
+        - port: 6379
+    # Prometheus (monitoring namespace) – scrape metrikuid
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 6379
+
+---
+# 2. Postgres – blokeeri ingress, luba rakendus + Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress
+  namespace: memelord-arno
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: memelord-arno-database
+  policyTypes:
+    - Ingress
+  ingress:
+    # Rakendus – ühendub PostgreSQLiga
+    - from:
+        - podSelector:
+            matchLabels:
+              app: memelord
+      ports:
+        - port: 5432
+    # Prometheus – scrape metrikuid
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 5432
+
+# =============================================================================
+# 3. Liiklus Traefikust Deploymenti (kirjeldus)
+# =============================================================================
+#
+# Teekond:
+#   Kasutaja (HTTPS) → Traefik Ingress Controller → memelord Service (ClusterIP:80) → memelord Pod (port 8000)
+#
+# Üksikasjad:
+#   - Ingress resource (host: memelord-arno.ee-lte-1.codemowers.io) määrab backend: service memelord:80
+#   - Traefik podid (tüüpiliselt kube-system või traefik namespace) proxyvad päringud
+#   - Liiklus läheb Service → Endpoints → Pod (app=memelord)
+#
+# NetworkPolicy Deploymentile: kui soovid piirata, võid lubada ingress ainult Traefiku podidelt:
+#   - namespaceSelector (traefik/kube-system) VÕI
+#   - podSelector Traefiku labelitega
+#
+# Praegune setup: Deployment pole siin piiratud – väline liiklus tuleb ainult Traefiku kaudu (Ingress).

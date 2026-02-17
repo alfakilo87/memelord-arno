@@ -1,0 +1,85 @@
+# # RBAC konfiguratsioon arendajale minimaalsete õigustega
+# # Asenda enne rakendamist:
+# #   - DEVELOPER_USERNAME: arendaja kasutajanimi (OIDC/SSO, nt kubectl auth whoami või whoami.ee-lte-1.codemowers.io)
+# #   - DEVELOPER_NAMESPACE: arendaja namespace (nt memelord-arno)
+# ---
+# # developer-DEVELOPER_USERNAME ClusterRole – võtab aluseks "view" (read-only namespaced objektid)
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: developer-DEVELOPER_USERNAME
+# rules:
+#   - apiGroups: [""]
+#     resources:
+#       - configmaps
+#       - endpoints
+#       - persistentvolumeclaims
+#       - pods
+#       - pods/log
+#       - pods/status
+#       - replicationcontrollers
+#       - services
+#       - serviceaccounts
+#     verbs: ["get", "list", "watch"]
+#   - apiGroups: ["apps"]
+#     resources:
+#       - daemonsets
+#       - deployments
+#       - replicasets
+#       - statefulsets
+#     verbs: ["get", "list", "watch"]
+#   - apiGroups: ["batch"]
+#     resources:
+#       - jobs
+#       - cronjobs
+#     verbs: ["get", "list", "watch"]
+#   - apiGroups: ["networking.k8s.io"]
+#     resources:
+#       - ingresses
+#       - networkpolicies
+#     verbs: ["get", "list", "watch"]
+#   - apiGroups: ["autoscaling"]
+#     resources:
+#       - horizontalpodautoscalers
+#     verbs: ["get", "list", "watch"]
+# ---
+# # RoleBinding – annab arendajale õiguse oma namespaces üldtundtud objekte vaadata
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: developer-DEVELOPER_USERNAME-binding
+#   namespace: DEVELOPER_NAMESPACE  # asenda arendaja namespace'iga
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: developer-DEVELOPER_USERNAME
+# subjects:
+#   - apiGroup: rbac.authorization.k8s.io
+#     kind: User
+#     name: DEVELOPER_USERNAME  # asenda arendaja kasutajanimega
+# ---
+# # developer-DEVELOPER_USERNAME-clusterwide – õigus vaadata Node ja Namespace objekte
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: developer-DEVELOPER_USERNAME-clusterwide
+# rules:
+#   - apiGroups: [""]
+#     resources:
+#       - nodes
+#       - namespaces
+#     verbs: ["get", "list", "watch"]
+# ---
+# # ClusterRoleBinding – annab arendajale õiguse Node ja Namespace vaadata
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: developer-DEVELOPER_USERNAME-clusterwide-binding
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: developer-DEVELOPER_USERNAME-clusterwide
+# subjects:
+#   - apiGroup: rbac.authorization.k8s.io
+#     kind: User
+#     name: DEVELOPER_USERNAME  # asenda arendaja kasutajanimega
